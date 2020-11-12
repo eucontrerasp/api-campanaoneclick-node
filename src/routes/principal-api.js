@@ -8,9 +8,11 @@ const atob = require('atob');
 const Blob = require('node-blob');
 const FileReader = require('filereader');
 
-router.get('/ObtenerImagenCampania', async(req, res) => {
+router.get('/ObtenerImagenCampania/:idCampana', async(req, res) => {
     try {
-        const resultado = await PrincipalDao.getBlobCampaña();
+
+        const { idCampana } = req.params;
+        const resultado = await PrincipalDao.getImagenCampaña(idCampana);
 
         const fileData = resultado.parametros[0].imagen;
 
@@ -28,19 +30,19 @@ router.get('/ObtenerImagenCampania', async(req, res) => {
 });
 
 
-router.post('/ActualizarImagenCampania', upload.single("data"), async(req, res) => {
+router.post('/ActualizarImagenCampania/:idCampana', upload.single("imagen"), async(req, res) => {
     try {
+
+        const { idCampana } = req.params;
 
         const file_buffer = fs.readFileSync(req.file.path);
 
         const contents_in_base64 = file_buffer.toString('base64');
 
-        // const fileBlob = b64toBlob(contents_in_base64, '', 10000000);
-
         const myBuffer = Buffer.from(contents_in_base64, 'base64');
 
 
-        const resultado = await PrincipalDao.updBlobCampaña(myBuffer);
+        const resultado = await PrincipalDao.updImagenCampaña(idCampana, myBuffer);
 
         fs.unlink(req.file.path, (err) => {
             if (err) {
@@ -52,7 +54,32 @@ router.post('/ActualizarImagenCampania', upload.single("data"), async(req, res) 
         });
 
 
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+});
 
+router.get('/ObtenerPDFCampania/:idCampana', async(req, res) => {
+    try {
+
+        let nombrePDF = '';
+        const { idCampana } = req.params;
+        const resultado = await PrincipalDao.getPDFCampaña(idCampana);
+
+        const fileData = resultado.parametros[0].pdf;
+        if (resultado.parametros[0].isapre === 'B') {
+            nombrePDF = 'TerminoCondiciones Banmedica.pdf';
+        } else {
+            nombrePDF = 'TerminoCondiciones VidaTres.pdf';
+        }
+
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=${nombrePDF}`);
+        res.setHeader('Content-Length', fileData.length);
+
+        return res.end(fileData);
 
     } catch (err) {
         console.log(err);
@@ -61,34 +88,35 @@ router.post('/ActualizarImagenCampania', upload.single("data"), async(req, res) 
 
 });
 
-function b64toBlob(contents_in_base64, contentType = 'image/png', sliceSize = 10000000) {
-    const byteCharacters = atob(contents_in_base64);
-    const byteArrays = [];
-    for (let offset = 0; offset < contents_in_base64.length; offset += sliceSize) {
-        const slice = byteCharacters.slice(offset, offset + sliceSize);
+router.post('/ActualizarPDFCampania/:idCampana', upload.single("pdf"), async(req, res) => {
+    try {
 
-        const byteNumbers = new Array(slice.length);
-        for (let i = 0; i < slice.length; i++) {
-            byteNumbers[i] = slice.charCodeAt(i);
-        }
+        const { idCampana } = req.params;
 
-        const byteArray = new Uint8Array(byteNumbers);
-        byteArrays.push(byteArray);
+        const file_buffer = fs.readFileSync(req.file.path);
+
+        const contents_in_base64 = file_buffer.toString('base64');
+
+        // const fileBlob = b64toBlob(contents_in_base64, '', 10000000);
+
+        const myBuffer = Buffer.from(contents_in_base64, 'base64');
+
+
+        const resultado = await PrincipalDao.updPDFCampaña(idCampana, myBuffer);
+
+        fs.unlink(req.file.path, (err) => {
+            if (err) {
+                console.error(err)
+                return
+            } else {
+                res.status(200).send(resultado);
+            }
+        });
+
+    } catch (err) {
+        console.log(err);
+        return err;
     }
-
-    const blob = new Blob(byteArrays, { type: contentType });
-
-    return blob;
-}
-
-function blobToBase64(blob, callback) {
-    let reader = new FileReader();
-    reader.onload = function() {
-        let dataUrl = reader.result;
-        let base64 = dataUrl.split(',')[1];
-        callback(base64);
-    };
-    reader.readAsDataURL(blob);
-};
+});
 
 module.exports = router;
